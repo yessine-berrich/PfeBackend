@@ -4,6 +4,16 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { ArticleModule } from './article/article.module';
+import { CategoryModule } from './category/category.module';
+import { TagModule } from './tag/tag.module';
+import { CommentModule } from './comment/comment.module';
+import { Comment } from './comment/entities/comment.entity';
+import { Tag } from './tag/entities/tag.entity';
+import { Category } from './category/entities/category.entity';
+import { ArticleVersion } from './article/entities/article-version.entity';
+import { Article } from './article/entities/article.entity';
+import { User } from './users/entities/user.entity';
 
 @Module({
   imports: [
@@ -17,10 +27,22 @@ import { ConfigModule } from '@nestjs/config';
       port: 5432,
       username: 'postgres',
       password: 'postgres',
-      database: 'pfeproject',
+      database: 'pfe_db',
+      entities: [
+        Article, 
+        ArticleVersion, 
+        Category, 
+        Tag, 
+        Comment, // Assurez-vous qu'il est BIEN ICI
+        User
+      ],
       autoLoadEntities: true,
       synchronize: true, // ❗ dev only
     }),
+    ArticleModule,
+    CategoryModule,
+    TagModule,
+    CommentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

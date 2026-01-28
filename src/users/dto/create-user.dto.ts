@@ -11,11 +11,11 @@ import { userRole } from 'utils/constants';
 export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
-  nom: string;
+  firstName: string;
 
   @IsString()
   @IsNotEmpty()
-  prenom: string;
+  lastName: string;
 
   @IsEmail()
   email: string;
@@ -23,10 +23,4 @@ export class CreateUserDto {
   @IsString()
   @MinLength(6)
   password: string;
-
-  @IsEnum(userRole)
-  role: userRole;
-
-  @IsOptional()
-  est_actif?: boolean;
 }
