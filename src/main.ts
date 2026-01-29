@@ -25,6 +25,11 @@ async function bootstrap() {
   //   optionsSuccessStatus: 204,
   // });
 
+  app.enableCors({
+    origin: 'http://localhost:3001', // Next.js
+    credentials: true,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

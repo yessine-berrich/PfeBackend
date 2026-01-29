@@ -14,10 +14,12 @@ import { Category } from './category/entities/category.entity';
 import { ArticleVersion } from './article/entities/article-version.entity';
 import { Article } from './article/entities/article.entity';
 import { User } from './users/entities/user.entity';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
     UsersModule,
+    MailModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),

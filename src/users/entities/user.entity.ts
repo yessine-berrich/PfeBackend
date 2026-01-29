@@ -32,6 +32,12 @@ export class User {
   @Column({ default: false })
   isActive: boolean;
 
+  @Column({ nullable: true })
+  verificationToken: string;
+
+  @Column({ nullable: true })
+  resetPasswordToken: string;
+
   @OneToMany(() => Article, (article) => article.author)
   articles: Article[];
 

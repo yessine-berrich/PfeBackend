@@ -1,128 +1,165 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { JwtPayloadType } from 'utils/types';
-import { LoginDto } from './dto/login.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { User } from './entities/user.entity';
-import { Repository } from 'typeorm';
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from 'bcryptjs';
-import { JwtService } from '@nestjs/jwt';
-import { userRole } from 'utils/constants';
+import { MailService } from "../mail/mail.service";
+import { randomBytes } from "node:crypto"
+import { ConfigService } from "@nestjs/config";
+import { User } from "./entities/user.entity";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { LoginDto } from "./dto/login.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { JwtPayloadType } from "utils/types";
+import { userRole } from "utils/constants";
 
 @Injectable()
 export class AuthService {
-  constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly jwtService: JwtService, 
-  ) {}
 
-  async register(CreateUserDto: CreateUserDto) {
-    const { firstName, lastName, email, password } =
-      CreateUserDto;
+    constructor(
+        @InjectRepository(User) private readonly userRepository: Repository<User>,
+        private readonly jwtService: JwtService,
+        private readonly mailService: MailService,
+        private readonly config: ConfigService
+    ) { }
 
-    const existingUser = await this.userRepository.findOne({
-      where: { email },
-    });
+   /**
+   * Create new user
+   * @param registerDto data for creating new user
+   * @returns a success message
+   */
+    public async register(registerDto: CreateUserDto) {
+        const { email, password, firstName, lastName } = registerDto;
 
-    if (existingUser) {
-      throw new BadRequestException('Cet e-mail est déjà utilisé.');
+        const userFromDb = await this.userRepository.findOne({ where: { email } });
+        if (userFromDb) throw new BadRequestException("user already exist");
+
+        const hashedPassword = await this.hashPassword(password);
+
+        let newUser = this.userRepository.create({
+            email,
+            firstName,
+            lastName,
+            password: hashedPassword,
+            verificationToken: randomBytes(32).toString('hex'),
+            role: userRole.EMPLOYEE,
+            isActive: false,
+        });
+
+        newUser = await this.userRepository.save(newUser);
+        const link = this.generateLink(newUser.id, newUser.verificationToken);
+
+        await this.mailService.sendVerifyEmailTemplate(email, link);
+
+        return { message: 'Verification token has been sent to your email, please verify your email address' };
     }
 
-    const salt = 10;
-    const hashedPassword = await bcrypt.hash(password, salt);
+    /**
+     * Log In user
+     * @param loginDto data for log in to user account
+     * @returns JWT (access token)
+     */
+    public async login(loginDto: LoginDto) {
+        const { email, password } = loginDto;
 
-    const user = this.userRepository.create({
-      firstName,
-      lastName,
-      email,
-      password: hashedPassword,
-      role: userRole.EMPLOYEE,
-      isActive: false,
-    });
+        const user = await this.userRepository.findOne({ where: { email } });
+        if (!user) throw new BadRequestException("invalid email or password");
 
-    let savedUser: User;
-    try {
-      savedUser = await this.userRepository.save(user);
+        const isPasswordMatch = await bcrypt.compare(password, user.password);
+        if (!isPasswordMatch) throw new BadRequestException("invalid email or password");
 
-    } catch (error) {
-      if (error.code === '23505') {
-        if (error.detail.includes('n_cin')) {
-          throw new BadRequestException('Ce numéro CIN est déjà enregistré.');
+        if (!user.isActive) {
+            let verificationToken = user.verificationToken;
+
+            if (!verificationToken) {
+                user.verificationToken = randomBytes(32).toString('hex');
+                const result = await this.userRepository.save(user);
+                verificationToken = result.verificationToken;
+            }
+
+            const link = this.generateLink(user.id, verificationToken);
+            await this.mailService.sendVerifyEmailTemplate(email, link);
+
+            return { message: 'Verification token has been sent to your email, please verify your email address' };
         }
-        if (error.detail.includes('rib')) {
-          throw new BadRequestException('Ce RIB est déjà enregistré.');
-        }
-        throw new BadRequestException(
-          'Erreur de données uniques. Vérifiez tous les champs.',
-        );
-      }
 
-      console.error(error);
-      throw new BadRequestException(
-        "Une erreur inattendue est survenue lors de l'enregistrement.",
-      );
+        const accessToken = await this.generateJWT({ sub: user.id, role: user.role });
+        return { accessToken };
     }
 
-    const payload = {
-      sub: savedUser.id,
-      email: savedUser.email,
-      role: savedUser.role,
-    };
-    const token = this.jwtService.sign(payload);
+    /**
+     *  Sending reset password link to the client
+     */
+    public async sendResetPasswordLink(email: string) {
+        const user = await this.userRepository.findOne({ where: { email } });
+        if (!user) throw new BadRequestException("user with given email does not exist");
 
-    const { password: _pwd, ...userWithoutPassword } = savedUser;
+        user.resetPasswordToken = randomBytes(32).toString('hex');
+        const result = await this.userRepository.save(user);
 
-    return {
-      message: "Inscription réussie. En attente d'activation.",
-      user: userWithoutPassword,
-    };
-  }
+        const resetPasswordLink = `${this.config.get<string>("CLIENT_DOMAIN")}/reset-password/${user.id}/${result.resetPasswordToken}`;
+        await this.mailService.sendResetPasswordTemplate(email, resetPasswordLink);
 
-  async login(loginDto: LoginDto) {
-    const { email, password } = loginDto;
+        return { message: "Password reset link sent to your email, please check your inbox" };
+    }
+    
+    /**
+     * Get reset password link
+     */
+    public async getResetPasswordLink(userId: number, resetPasswordToken: string) {
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new BadRequestException("invalid link");
 
-    const user = await this.userRepository.findOne({ where: { email } });
+        if (user.resetPasswordToken === null || user.resetPasswordToken !== resetPasswordToken)
+            throw new BadRequestException("invalid link");
 
-    if (!user) {
-      return { success: false, message: 'Email ou mot de passe incorrect' };
+        return { message: 'valid link' }
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    /**
+     *  Reset the password
+     */
+    public async resetPassword(dto: ResetPasswordDto) {
+        const { userId, resetPasswordToken, newPassword } = dto;
 
-    if (!passwordMatch) {
-      return { success: false, message: 'Email ou mot de passe incorrect' };
+        const user = await this.userRepository.findOne({ where: { id: userId } });
+        if (!user) throw new BadRequestException("invalid link");
+
+        if (user.resetPasswordToken === null || user.resetPasswordToken !== resetPasswordToken)
+            throw new BadRequestException("invalid link");
+
+        const hashedPassword = await this.hashPassword(newPassword);
+        user.password = hashedPassword;
+        user.resetPasswordToken = '';
+        await this.userRepository.save(user);
+
+        return { message: 'password reset successfully, please log in' };
     }
 
-    if (!user.isActive) {
-      return {
-        success: false,
-        message:
-          "Votre compte n'est pas encore actif. Veuillez contacter l'administrateur.",
-      };
+
+    /**
+     * Hashing password
+     * @param password plain text password
+     * @returns hashed password
+     */
+    public async hashPassword(password: string): Promise<string> {
+        const salt = await bcrypt.genSalt(10);
+        return bcrypt.hash(password, salt);
     }
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
-    const token = this.jwtService.sign(payload);
+    /**
+     * Generate Json Web Token
+     * @param payload JWT payload
+     * @returns token
+     */
+    private generateJWT(payload: JwtPayloadType): Promise<string> {
+        return this.jwtService.signAsync(payload);
+    }
 
-    const { password: _pwd, ...userWithoutPassword } = user;
-
-    return {
-      success: true,
-      token,
-      user: userWithoutPassword,
-    };
-  }
-
-  async hashPassword(password: string): Promise<string> {
-    return await bcrypt.hash(password, 10);
-  }
-
-  private generateJWT(payload: JwtPayloadType): Promise<string> {
-    return this.jwtService.signAsync(payload);
-  }
+    /**
+     *  Generate email verification link
+     */
+    private generateLink(userId: number, verificationToken: string) {
+        return `${this.config.get<string>("DOMAIN")}/api/users/verify-email/${userId}/${verificationToken}`;
+    }
 }

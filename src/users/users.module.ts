@@ -6,8 +6,10 @@ import { User } from './entities/user.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailModule } from 'src/mail/mail.module';
 @Module({
   imports: [
+    MailModule,
     TypeOrmModule.forFeature([User]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
