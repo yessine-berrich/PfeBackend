@@ -1,26 +1,29 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
+import { 
+  Controller, Get, Post, Body, Patch, Param, Delete, 
+  UseGuards, ParseIntPipe 
 } from '@nestjs/common';
-import { ArticleService } from './article.service';
 import { CreateArticleDto } from './dto/create-article.dto';
-import { User } from 'src/users/entities/user.entity';
+import { UpdateArticleDto } from './dto/update-article.dto';
+import { userRole } from 'utils/constants';
+import { ArticleService } from './article.service';
+import { Roles } from 'src/users/decorators/user-role.decorator';
+import { AuthGuard } from 'src/users/guards/auth.guard';
+import { CurrentPayload } from 'src/users/decorators/current-payload.decorator';
+import type { JwtPayloadType } from 'utils/types';
+
 
 @Controller('api/articles')
 export class ArticleController {
   constructor(private readonly articleService: ArticleService) {}
 
   @Post()
-  async create(@Body() createArticleDto: CreateArticleDto) {
-    // TODO: Une fois l'auth en place, utiliser @GetUser() pour avoir le vrai user
-    const mockUser = { id: 1 } as User; 
-    return this.articleService.create(createArticleDto, mockUser);
+  @Roles(userRole.ADMIN, userRole.EMPLOYEE)
+  @UseGuards(AuthGuard)
+  create(
+    @Body() createArticleDto: CreateArticleDto, 
+    @CurrentPayload() payload: JwtPayloadType
+  ) {
+    return this.articleService.create(createArticleDto, payload.sub);
   }
 
   @Get()
@@ -34,32 +37,18 @@ export class ArticleController {
   }
 
   @Patch(':id')
+  @Roles(userRole.ADMIN, userRole.EMPLOYEE)
+  @UseGuards(AuthGuard)
   update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateDto: any, // Tu pourras créer un UpdateArticleDto plus tard
+    @Param('id', ParseIntPipe) id: number, 
+    @Body() updateArticleDto: UpdateArticleDto
   ) {
-    return this.articleService.update(id, updateDto);
-  }
-
-  @Patch(':id/publish')
-  publish(@Param('id', ParseIntPipe) id: number) {
-    return this.articleService.publish(id);
-  }
-
-  @Patch(':id/archive')
-  archive(@Param('id', ParseIntPipe) id: number) {
-    return this.articleService.archive(id);
-  }
-
-  @Post(':id/restore/:versionId')
-  restore(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('versionId', ParseIntPipe) versionId: number,
-  ) {
-    return this.articleService.restoreVersion(id, versionId);
+    return this.articleService.update(id, updateArticleDto);
   }
 
   @Delete(':id')
+  @Roles(userRole.ADMIN, userRole.EMPLOYEE)
+  @UseGuards(AuthGuard)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.articleService.remove(id);
   }

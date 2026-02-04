@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LoginDto } from './dto/login.dto';
 import { AuthService } from './auth.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { In } from 'typeorm';
 
 @Injectable()
 export class UsersService {
@@ -100,4 +101,14 @@ export class UsersService {
   public resetPassword(dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
+
+  async findByUsernames(usernames: string[]): Promise<User[]> {
+  if (usernames.length === 0) return [];
+  
+  return await this.userRepository.find({
+    where: {
+      username: In(usernames), // "username" doit être le nom de ta colonne en base
+    },
+  });
+}
 }

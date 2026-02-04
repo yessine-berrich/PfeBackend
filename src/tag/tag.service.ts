@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Tag } from './entities/tag.entity';
 import { CreateTagDto } from './dto/create-tag.dto';
 
@@ -11,12 +11,27 @@ export class TagService {
     private readonly tagRepository: Repository<Tag>,
   ) {}
 
-  async create(createTagDto: CreateTagDto): Promise<Tag> {
+  create(createTagDto: CreateTagDto): Promise<Tag> {
     const tag = this.tagRepository.create(createTagDto);
-    return await this.tagRepository.save(tag);
+    return this.tagRepository.save(tag);
   }
 
-  async findAll(): Promise<Tag[]> {
-    return await this.tagRepository.find();
+  findAll(): Promise<Tag[]> {
+    return this.tagRepository.find();
+  }
+
+  // Très utile pour le filtrage par tags
+  async findOne(id: number): Promise<Tag> {
+    const tag = await this.tagRepository.findOne({
+      where: { id },
+      relations: ['articles'],
+    });
+    if (!tag) throw new NotFoundException(`Tag #${id} non trouvé`);
+    return tag;
+  }
+
+  async remove(id: number): Promise<void> {
+    const tag = await this.findOne(id);
+    await this.tagRepository.remove(tag);
   }
 }

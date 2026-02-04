@@ -1,4 +1,5 @@
 import { Article } from 'src/article/entities/article.entity';
+import { Comment } from 'src/comment/entities/comment.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -40,6 +41,9 @@ export class User {
 
   @OneToMany(() => Article, (article) => article.author)
   articles: Article[];
+
+  @OneToMany(() => Comment, (comment) => comment.author)
+  comments: Comment[];
 
   @CreateDateColumn()
   createdAt: Date;

@@ -26,6 +26,5 @@ export class AuthGuard implements CanActivate {
         } catch (error) {
             throw new UnauthorizedException("Invalid or expired token");
         }
-
     }
 }

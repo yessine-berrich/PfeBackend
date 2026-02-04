@@ -15,6 +15,7 @@ import { ArticleVersion } from './article/entities/article-version.entity';
 import { Article } from './article/entities/article.entity';
 import { User } from './users/entities/user.entity';
 import { MailModule } from './mail/mail.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -35,16 +36,17 @@ import { MailModule } from './mail/mail.module';
         ArticleVersion, 
         Category, 
         Tag, 
-        Comment, // Assurez-vous qu'il est BIEN ICI
+        Comment,
         User
       ],
       autoLoadEntities: true,
-      synchronize: true, // ❗ dev only
+      synchronize: true, // dev only
     }),
     ArticleModule,
     CategoryModule,
     TagModule,
     CommentModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
