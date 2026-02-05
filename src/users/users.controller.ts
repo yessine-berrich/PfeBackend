@@ -10,6 +10,13 @@ import {
   HttpStatus,
   UseGuards,
   ParseIntPipe,
+  BadRequestException,
+  UploadedFile,
+  UseInterceptors,
+  UsePipes,
+  ValidationPipe,
+  NotFoundException,
+  Res,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -22,6 +29,11 @@ import type { JwtPayloadType } from 'utils/types';
 import { AuthRolesGuard } from './guards/auth-roles.guard';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { extname } from 'path/win32';
+import { diskStorage } from 'multer';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { join } from 'path';
 
 @Controller('api/users')
 export class UsersController {
@@ -40,7 +52,7 @@ export class UsersController {
 
   @Get('/current-user')
   @Roles(userRole.ADMIN, userRole.EMPLOYEE)
-  @UseGuards(AuthGuard) 
+  @UseGuards(AuthGuard)
   getCurrentUser(@CurrentPayload() payload: JwtPayloadType) {
     return this.usersService.getCurrentUser(payload.sub);
   }
@@ -60,33 +72,104 @@ export class UsersController {
   }
 
   // GET: ~/api/users/verify-email/:id/:verificationToken
-    @Get("verify-email/:id/:verificationToken")
-    public verifyEmail(
-        @Param('id', ParseIntPipe) id: number,
-        @Param('verificationToken') verificationToken: string
-    ) {
-        return this.usersService.verifyEmail(id, verificationToken);
+  @Get('verify-email/:id/:verificationToken')
+  public verifyEmail(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('verificationToken') verificationToken: string,
+  ) {
+    return this.usersService.verifyEmail(id, verificationToken);
+  }
+
+  // POST: ~/api/users/forgot-password
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  public forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.usersService.sendResetPassword(body.email);
+  }
+
+  // GET: ~/api/users/reset-password/:id/:resetPasswordToken
+  @Get('reset-password/:id/:resetPasswordToken')
+  public getResetPassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('resetPasswordToken') resetPasswordToken: string,
+  ) {
+    return this.usersService.getResetPassword(id, resetPasswordToken);
+  }
+
+  // POST: ~/api/users/reset-password
+  @Post('reset-password')
+  public resetPassword(@Body() body: ResetPasswordDto) {
+    return this.usersService.resetPassword(body);
+  }
+
+  @Patch(':id')
+  @UseInterceptors(
+    FileInterceptor('profileImage', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, callback) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          callback(null, `profile-${uniqueSuffix}${ext}`);
+        },
+      }),
+    }),
+  )
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto, // Le type possède maintenant profileImage
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    // On crée un objet de données à envoyer au service
+    const updateData = { ...updateUserDto };
+
+    if (file) {
+      // L'erreur TS2339 disparaîtra ici car UpdateUserDto contient profileImage
+      updateData.profileImage = `/uploads/${file.filename}`;
     }
 
-    // POST: ~/api/users/forgot-password
-    @Post("forgot-password")
-    @HttpCode(HttpStatus.OK)
-    public forgotPassword(@Body() body: ForgotPasswordDto) {
-        return this.usersService.sendResetPassword(body.email);
+    return this.usersService.update(+id, updateData);
+  }
+
+  @Get('profile-image/:id')
+  async getProfileImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: any, // Utilise l'interface importée d'express
+  ) {
+    const user = await this.usersService.getUserById(id);
+
+    if (!user || !user.profileImage) {
+      throw new NotFoundException(
+        "Cet utilisateur n'a pas de photo de profil.",
+      );
     }
 
-    // GET: ~/api/users/reset-password/:id/:resetPasswordToken
-    @Get("reset-password/:id/:resetPasswordToken")
-    public getResetPassword(
-        @Param("id", ParseIntPipe) id: number,
-        @Param("resetPasswordToken") resetPasswordToken: string
-    ) {
-        return this.usersService.getResetPassword(id, resetPasswordToken);
-    }
+    // Construction du chemin. Note : On retire le slash initial de profileImage
+    // s'il existe pour éviter des erreurs avec join()
+    const relativePath = user.profileImage.startsWith('/')
+      ? user.profileImage.substring(1)
+      : user.profileImage;
 
-    // POST: ~/api/users/reset-password
-    @Post("reset-password")
-    public resetPassword(@Body() body: ResetPasswordDto) {
-        return this.usersService.resetPassword(body);
-    }
+    const imagePath = join(process.cwd(), relativePath);
+
+    // Utilisation d'un callback pour gérer l'erreur si le fichier est absent du disque
+    return res.sendFile(imagePath, (err) => {
+      if (err) {
+        if (!res.headersSent) {
+          res.status(404).send({
+            message: 'Le fichier physique est introuvable sur le serveur.',
+          });
+        }
+      }
+    });
+  }
+
+  @Delete(':id')
+  @UseGuards(AuthRolesGuard)
+  @Roles(userRole.ADMIN) // Seul l'ADMIN peut supprimer un compte
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.remove(id);
+  }
 }

@@ -1,5 +1,6 @@
 import { Article } from 'src/article/entities/article.entity';
 import { Comment } from 'src/comment/entities/comment.entity';
+import { Notification } from 'src/notification/entities/notification.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -27,6 +28,39 @@ export class User {
   @Column({ length: 255 })
   password: string;
 
+  @Column({ nullable: true })
+  phone: string;
+
+  @Column({ type: 'text', nullable: true })
+  bio: string;
+
+  @Column({ nullable: true })
+  country: string;
+
+  @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  state: string;
+
+  @Column({ nullable: true })
+  postalCode: string;
+
+  @Column({ nullable: true })
+  facebook: string;
+
+  @Column({ nullable: true })
+  twitter: string;
+
+  @Column({ nullable: true })
+  linkedin: string;
+
+  @Column({ nullable: true })
+  instagram: string;
+
+  @Column({ nullable: true })
+  profileImage: string; // Stockera l'URL de l'image (ex: /uploads/avatar.jpg)
+
   @Column({ type: 'enum', enum: userRole })
   role: userRole;
 
@@ -44,6 +78,9 @@ export class User {
 
   @OneToMany(() => Comment, (comment) => comment.author)
   comments: Comment[];
+
+  @OneToMany(() => Notification, (notification) => notification.recipient)
+  notifications: Notification[];
 
   @CreateDateColumn()
   createdAt: Date;

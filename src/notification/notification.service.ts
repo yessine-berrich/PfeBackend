@@ -1,4 +1,3 @@
-// notification.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,8 +12,9 @@ export class NotificationService {
   ) {}
 
   async send(userId: number, message: string, link: string) {
+    // On utilise "as any" sur les relations si TS est trop strict avec les IDs
     const notification = this.notificationRepository.create({
-      recipient: { id: userId },
+      recipient: { id: userId } as any,
       message,
       link,
       isRead: false,
@@ -23,23 +23,23 @@ export class NotificationService {
     return await this.notificationRepository.save(notification);
   }
 
-  // Helper pour les mentions
   async notifyMentions(users: User[], comment: any) {
+    const authorName = `${comment.author.firstName} ${comment.author.lastName}`;
     const promises = users.map(user => 
       this.send(
         user.id, 
-        `${comment.author.username} vous a mentionné dans un commentaire.`,
+        `${authorName} vous a mentionné dans un commentaire.`,
         `/articles/${comment.article.id}`
       )
     );
     await Promise.all(promises);
   }
 
-  // Helper pour les réponses
   async notifyReply(parentAuthor: User, reply: any) {
+    const authorName = `${reply.author.firstName} ${reply.author.lastName}`;
     await this.send(
       parentAuthor.id,
-      `${reply.author.username} a répondu à votre commentaire.`,
+      `${authorName} a répondu à votre commentaire.`,
       `/articles/${reply.article.id}`
     );
   }

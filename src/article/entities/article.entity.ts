@@ -1,31 +1,38 @@
+import { Category } from 'src/category/entities/category.entity';
+import { Tag } from 'src/tag/entities/tag.entity';
+import { User } from 'src/users/entities/user.entity';
+import { Comment } from 'src/comment/entities/comment.entity';
+import { Media } from 'src/media/entities/media.entity'; // Importe l'entité Media
+
 import {
+  Column,
   Entity,
   PrimaryGeneratedColumn,
-  Column,
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  OneToMany,
   ManyToMany,
   JoinTable,
+  OneToMany,
 } from 'typeorm';
-import { ArticleStatus } from 'utils/constants';
 import { ArticleVersion } from './article-version.entity';
-import { User } from 'src/users/entities/user.entity';
-import { Category } from 'src/category/entities/category.entity';
-import { Tag } from 'src/tag/entities/tag.entity';
-import { Comment } from 'src/comment/entities/comment.entity';
+
+export enum ArticleStatus {
+  DRAFT = 'draft',
+  PENDING = 'pending', // Correction, 'pending' ou 'draft' selon tes besoins
+  PUBLISHED = 'published',
+}
 
 @Entity('articles')
 export class Article {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 255 })
+  @Column()
   title: string;
 
   @Column({ type: 'text' })
-  content: string;
+  content: string; // Stockera le Markdown (avec URLs d'images)
 
   @Column({
     type: 'enum',
@@ -34,26 +41,25 @@ export class Article {
   })
   status: ArticleStatus;
 
-  // User (author)
-  @ManyToOne(() => User, (user) => user.articles, { eager: true })
+  @ManyToOne(() => User, (user) => user.articles)
   author: User;
 
-  // Comments
+  @ManyToOne(() => Category, (category) => category.articles)
+  category: Category;
+
+  @ManyToMany(() => Tag)
+  @JoinTable({ name: 'article_tags' })
+  tags: Tag[];
+
   @OneToMany(() => Comment, (comment) => comment.article)
   comments: Comment[];
 
-  // Category
-  @ManyToOne(() => Category, (category) => category.articles, { eager: true })
-  category: Category;
+  // NOUVEAU : Relation pour les pièces jointes (fichiers et/ou images non-intégrées au Markdown)
+  @OneToMany(() => Media, (media) => media.article, { cascade: true }) // important pour sauvegarder les médias avec l'article
+  media: Media[];
 
-  // Versions
   @OneToMany(() => ArticleVersion, (version) => version.article)
   versions: ArticleVersion[];
-
-  // Tags
-  @ManyToMany(() => Tag, (tag) => tag.articles, { cascade: true })
-  @JoinTable()
-  tags: Tag[];
 
   @CreateDateColumn()
   createdAt: Date;

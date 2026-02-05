@@ -10,6 +10,7 @@ import { Roles } from 'src/users/decorators/user-role.decorator';
 import { AuthGuard } from 'src/users/guards/auth.guard';
 import { CurrentPayload } from 'src/users/decorators/current-payload.decorator';
 import type { JwtPayloadType } from 'utils/types';
+import { User } from 'src/users/entities/user.entity';
 
 
 @Controller('api/articles')
@@ -23,7 +24,7 @@ export class ArticleController {
     @Body() createArticleDto: CreateArticleDto, 
     @CurrentPayload() payload: JwtPayloadType
   ) {
-    return this.articleService.create(createArticleDto, payload.sub);
+    return this.articleService.create(createArticleDto,{ id: payload.sub } as User);
   }
 
   @Get()

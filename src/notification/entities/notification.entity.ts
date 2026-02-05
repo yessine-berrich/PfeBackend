@@ -1,5 +1,11 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+} from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn } from 'typeorm';
 
 @Entity('notifications')
 export class Notification {
@@ -9,14 +15,14 @@ export class Notification {
   @Column()
   message: string;
 
+  @Column()
+  link: string; // Cette colonne manquait probablement
+
   @Column({ default: false })
   isRead: boolean;
 
-  @Column()
-  type: string; // ex: 'COMMENT', 'VALIDATION', 'UPDATE'
-
-  @ManyToOne(() => User)
-  recipient: User;
+  @ManyToOne(() => User, (user) => user.notifications)
+  recipient: User; // Utilise 'recipient' ici pour correspondre au service
 
   @CreateDateColumn()
   createdAt: Date;

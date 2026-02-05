@@ -7,11 +7,13 @@ import { ArticleVersion } from './entities/article-version.entity';
 import { Category } from 'src/category/entities/category.entity';
 import { Tag } from 'src/tag/entities/tag.entity';
 import { UsersModule } from 'src/users/users.module';
+import { MediaModule } from 'src/media/media.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Article, ArticleVersion, Category, Tag]),
-    UsersModule
+    UsersModule,
+    MediaModule
   ],
   controllers: [ArticleController],
   providers: [ArticleService],
