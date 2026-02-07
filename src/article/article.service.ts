@@ -8,6 +8,7 @@ import { Category } from 'src/category/entities/category.entity';
 import { Tag } from 'src/tag/entities/tag.entity';
 import { MediaService } from 'src/media/media.service'; // Importe MediaService
 import { UpdateArticleDto } from './dto/update-article.dto';
+import { SemanticService } from 'src/semantic/semantic.service';
 
 @Injectable()
 export class ArticleService {
@@ -19,6 +20,7 @@ export class ArticleService {
     // @InjectRepository(Tag) // Si tu veux manipuler Tag directement ici
     // private readonly tagRepository: Repository<Tag>,
     private readonly mediaService: MediaService, // Injecte MediaService
+    private semanticService: SemanticService,
   ) {}
 
   async create(createArticleDto: CreateArticleDto, user: User) {
@@ -29,28 +31,63 @@ export class ArticleService {
       ...articleData
     } = createArticleDto;
 
-    // Création de l'article de base
+    // 1. Préparation de l'entité
     const article = this.articleRepository.create({
       ...articleData,
       author: user,
       category: { id: categoryId },
       tags: tagIds?.map((id) => ({ id })) || [],
-      // Les médias seront attachés après la sauvegarde de l'article ou via la cascade
-      media: [], // Initialise le tableau, sera rempli ci-dessous
-      status: createArticleDto.status || ArticleStatus.DRAFT, // Default si non fourni
+      media: [],
+      status: createArticleDto.status || ArticleStatus.DRAFT,
     });
 
+    // 2. Premier enregistrement (pour obtenir l'ID)
     const savedArticle = await this.articleRepository.save(article);
 
-    // Si des médias sont fournis (ils ont déjà été uploadés et leurs URLs sont disponibles)
+    // 3. Gestion des médias (ton code existant)
     if (mediaDtos && mediaDtos.length > 0) {
-  const mediaEntities = mediaDtos.map(dto => this.mediaService.create({ 
-    ...dto, 
-    articleId: savedArticle.id, // On utilise l'ID ici pour correspondre au DTO
-    type: this.mediaService.getMediaTypeFromMimeType(dto.mimetype)
-  }));
-      savedArticle.media = await Promise.all(mediaEntities); // Attend que tous les médias soient enregistrés
-      await this.articleRepository.save(savedArticle); // Sauvegarde l'article avec les médias attachés
+      const mediaEntities = mediaDtos.map((dto) =>
+        this.mediaService.create({
+          ...dto,
+          articleId: savedArticle.id,
+          type: this.mediaService.getMediaTypeFromMimeType(dto.mimetype),
+        }),
+      );
+      savedArticle.media = await Promise.all(mediaEntities);
+    }
+
+    // --- NOUVEAU : GENERATION DU VECTEUR SEMANTIQUE ---
+
+    // On récupère l'article complet avec les noms de catégories/tags pour un meilleur vecteur
+    const fullArticle = await this.articleRepository.findOne({
+      where: { id: savedArticle.id },
+      relations: ['category', 'tags'],
+    });
+
+    if (fullArticle) {
+      // On combine Titre + Contenu + Nom de catégorie pour Ollama
+      const textToEmbed = `
+      Titre: ${fullArticle.title}. 
+      Contenu: ${fullArticle.content}. 
+      Catégorie: ${fullArticle.category?.name || ''}
+    `.trim();
+
+      try {
+        // Appel à Ollama via ton service
+        fullArticle.embedding =
+          await this.semanticService.getVector(textToEmbed);
+
+        // Sauvegarde finale avec le vecteur
+        await this.articleRepository.save(fullArticle);
+        return fullArticle;
+      } catch (error) {
+        console.error(
+          'Échec de la génération du vecteur lors de la création:',
+          error,
+        );
+        // On retourne quand même l'article, il sera juste indexé plus tard par la synchro manuelle
+        return fullArticle;
+      }
     }
 
     return savedArticle;

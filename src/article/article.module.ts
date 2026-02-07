@@ -8,12 +8,14 @@ import { Category } from 'src/category/entities/category.entity';
 import { Tag } from 'src/tag/entities/tag.entity';
 import { UsersModule } from 'src/users/users.module';
 import { MediaModule } from 'src/media/media.module';
+import { SemanticModule } from 'src/semantic/semantic.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Article, ArticleVersion, Category, Tag]),
     UsersModule,
-    MediaModule
+    MediaModule,
+    SemanticModule,
   ],
   controllers: [ArticleController],
   providers: [ArticleService],

@@ -47,7 +47,7 @@ export class Article {
   @ManyToOne(() => Category, (category) => category.articles)
   category: Category;
 
-  @ManyToMany(() => Tag)
+  @ManyToMany(() => Tag, (tag) => tag.articles) // Ajoute (tag) => tag.articles ici
   @JoinTable({ name: 'article_tags' })
   tags: Tag[];
 
@@ -60,6 +60,13 @@ export class Article {
 
   @OneToMany(() => ArticleVersion, (version) => version.article)
   versions: ArticleVersion[];
+
+  @Column({
+  type: 'float4', // On trompe TypeORM temporairement
+  array: true,
+  nullable: true
+})
+embedding: number[];
 
   @CreateDateColumn()
   createdAt: Date;

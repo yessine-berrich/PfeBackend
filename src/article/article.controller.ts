@@ -1,6 +1,15 @@
-import { 
-  Controller, Get, Post, Body, Patch, Param, Delete, 
-  UseGuards, ParseIntPipe 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  ParseIntPipe,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
@@ -12,7 +21,6 @@ import { CurrentPayload } from 'src/users/decorators/current-payload.decorator';
 import type { JwtPayloadType } from 'utils/types';
 import { User } from 'src/users/entities/user.entity';
 
-
 @Controller('api/articles')
 export class ArticleController {
   constructor(private readonly articleService: ArticleService) {}
@@ -21,10 +29,12 @@ export class ArticleController {
   @Roles(userRole.ADMIN, userRole.EMPLOYEE)
   @UseGuards(AuthGuard)
   create(
-    @Body() createArticleDto: CreateArticleDto, 
-    @CurrentPayload() payload: JwtPayloadType
+    @Body() createArticleDto: CreateArticleDto,
+    @CurrentPayload() payload: JwtPayloadType,
   ) {
-    return this.articleService.create(createArticleDto,{ id: payload.sub } as User);
+    return this.articleService.create(createArticleDto, {
+      id: payload.sub,
+    } as User);
   }
 
   @Get()
@@ -41,8 +51,8 @@ export class ArticleController {
   @Roles(userRole.ADMIN, userRole.EMPLOYEE)
   @UseGuards(AuthGuard)
   update(
-    @Param('id', ParseIntPipe) id: number, 
-    @Body() updateArticleDto: UpdateArticleDto
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateArticleDto: UpdateArticleDto,
   ) {
     return this.articleService.update(id, updateArticleDto);
   }

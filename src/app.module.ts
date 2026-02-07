@@ -17,6 +17,7 @@ import { User } from './users/entities/user.entity';
 import { MailModule } from './mail/mail.module';
 import { NotificationModule } from './notification/notification.module';
 import { MediaModule } from './media/media.module';
+import { SemanticModule } from './semantic/semantic.module';
 
 @Module({
   imports: [
@@ -41,7 +42,7 @@ import { MediaModule } from './media/media.module';
         User,
       ],
       autoLoadEntities: true,
-      synchronize: true, // dev only
+      synchronize: false, // dev only
     }),
     ArticleModule,
     CategoryModule,
@@ -49,6 +50,7 @@ import { MediaModule } from './media/media.module';
     CommentModule,
     NotificationModule,
     MediaModule,
+    SemanticModule,
   ],
   controllers: [AppController],
   providers: [AppService],

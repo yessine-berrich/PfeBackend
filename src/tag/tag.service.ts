@@ -15,6 +15,7 @@ export class TagService {
 
   async findAll(): Promise<Tag[]> {
     return this.tagRepository.find({
+      relations: ['articles'],
       order: {
         name: 'ASC',
       },
@@ -24,6 +25,7 @@ export class TagService {
   async findOne(id: number): Promise<Tag> {
     const tag = await this.tagRepository.findOne({
       where: { id },
+      relations: ['articles'],
     });
 
     if (!tag) {
