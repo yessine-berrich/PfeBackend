@@ -7,12 +7,15 @@ import { User } from 'src/users/entities/user.entity';
 import { MediaService } from 'src/media/media.service'; // Importe MediaService
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { SemanticService } from 'src/semantic/semantic.service';
+import { ArticleView } from './entities/article-view.entity';
 
 @Injectable()
 export class ArticleService {
   constructor(
     @InjectRepository(Article)
     private readonly articleRepository: Repository<Article>,
+    @InjectRepository(ArticleView)
+    private readonly viewRepository: Repository<ArticleView>,
     private readonly mediaService: MediaService, // Injecte MediaService
     private semanticService: SemanticService,
   ) {}
@@ -122,5 +125,38 @@ export class ArticleService {
       throw new NotFoundException(`Article #${id} not found`);
     }
     return article;
+  }
+
+  async incrementView(articleId: number, userId?: number, ip?: string) {
+    // 1. On cherche si une vue existe déjà
+    const alreadyViewed = await this.viewRepository.findOne({
+      where: {
+        article: { id: articleId },
+        ...(userId ? { user: { id: userId } } : { ipAddress: ip }),
+      },
+    });
+
+    if (!alreadyViewed) {
+      // 2. On prépare l'objet de création proprement
+      const viewData: any = {
+        article: { id: articleId },
+        ipAddress: ip,
+      };
+
+      // N'ajoute la propriété user que si l'id existe (évite le null)
+      if (userId) {
+        viewData.user = { id: userId };
+      }
+
+      const view = this.viewRepository.create(viewData);
+      await this.viewRepository.save(view);
+
+      // 3. Incrémenter le compteur global sur l'article pour l'affichage rapide
+      await this.articleRepository.increment(
+        { id: articleId },
+        'viewsCount',
+        1,
+      );
+    }
   }
 }

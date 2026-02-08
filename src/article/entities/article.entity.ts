@@ -41,6 +41,9 @@ export class Article {
   })
   status: ArticleStatus;
 
+  @Column({ default: 0 })
+  viewsCount: number;
+
   @ManyToOne(() => User, (user) => user.articles)
   author: User;
 
@@ -62,11 +65,11 @@ export class Article {
   versions: ArticleVersion[];
 
   @Column({
-  type: 'float4', // On trompe TypeORM temporairement
-  array: true,
-  nullable: true
-})
-embedding: number[];
+    type: 'float4', // On trompe TypeORM temporairement
+    array: true,
+    nullable: true,
+  })
+  embedding: number[];
 
   @CreateDateColumn()
   createdAt: Date;

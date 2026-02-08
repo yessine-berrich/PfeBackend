@@ -9,10 +9,11 @@ import { Tag } from 'src/tag/entities/tag.entity';
 import { UsersModule } from 'src/users/users.module';
 import { MediaModule } from 'src/media/media.module';
 import { SemanticModule } from 'src/semantic/semantic.module';
+import { ArticleView } from './entities/article-view.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Article, ArticleVersion, Category, Tag]),
+    TypeOrmModule.forFeature([Article, ArticleVersion, Category, Tag, ArticleView]),
     UsersModule,
     MediaModule,
     SemanticModule,

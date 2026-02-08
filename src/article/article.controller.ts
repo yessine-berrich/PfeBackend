@@ -63,4 +63,9 @@ export class ArticleController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.articleService.remove(id);
   }
+
+  @Post(':id/view')
+  async handleView(@Param('id') id: string) {
+    return this.articleService.incrementView(+id);
+  }
 }
