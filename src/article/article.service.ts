@@ -4,8 +4,6 @@ import { Repository } from 'typeorm';
 import { Article, ArticleStatus } from './entities/article.entity';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { User } from 'src/users/entities/user.entity';
-import { Category } from 'src/category/entities/category.entity';
-import { Tag } from 'src/tag/entities/tag.entity';
 import { MediaService } from 'src/media/media.service'; // Importe MediaService
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { SemanticService } from 'src/semantic/semantic.service';
@@ -15,10 +13,6 @@ export class ArticleService {
   constructor(
     @InjectRepository(Article)
     private readonly articleRepository: Repository<Article>,
-    // @InjectRepository(Category) // Si tu veux manipuler Category directement ici
-    // private readonly categoryRepository: Repository<Category>,
-    // @InjectRepository(Tag) // Si tu veux manipuler Tag directement ici
-    // private readonly tagRepository: Repository<Tag>,
     private readonly mediaService: MediaService, // Injecte MediaService
     private semanticService: SemanticService,
   ) {}
