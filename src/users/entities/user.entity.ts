@@ -8,6 +8,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToMany,
 } from 'typeorm';
 import { userRole } from 'utils/constants';
 
@@ -78,6 +79,9 @@ export class User {
 
   @OneToMany(() => Comment, (comment) => comment.author)
   comments: Comment[];
+
+  @ManyToMany(() => Comment, (comment) => comment.likes)
+  likedComments: Comment[];
 
   @OneToMany(() => Notification, (notification) => notification.recipient)
   notifications: Notification[];

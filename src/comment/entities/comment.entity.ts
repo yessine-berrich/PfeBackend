@@ -48,6 +48,10 @@ export class Comment {
   @JoinTable({ name: 'comment_mentions' })
   mentionedUsers: User[];
 
+  @ManyToMany(() => User, (user) => user.likedComments)
+  @JoinTable({ name: 'comment_likes' }) // Crée une table pivot automatique
+  likes: User[];
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, IsNull } from 'typeorm';
 // Utilisation d'alias pour éviter les conflits avec les types globaux du navigateur
@@ -112,13 +112,60 @@ export class CommentService {
   }
 
   async findByArticle(articleId: number) {
-    return this.commentRepository.find({
-      where: {
-        article: { id: articleId },
-        parent: IsNull(), // On ne récupère que les commentaires parents au premier niveau
-      },
-      relations: ['author', 'replies', 'replies.author', 'mentionedUsers'],
-      order: { createdAt: 'DESC' },
-    });
+  return this.commentRepository.find({
+    where: {
+      article: { id: articleId },
+      parent: IsNull(),
+    },
+    relations: [
+      'author', 
+      'likes', // Crucial pour afficher le compte des likes
+      'replies', 
+      'replies.author', 
+      'replies.likes' // Si vous voulez aussi les likes sur les réponses
+    ],
+    order: { createdAt: 'DESC' },
+  });
+}
+
+async toggleLike(commentId: number, user: User) {
+  // On charge le commentaire avec ses likes existants
+  const comment = await this.commentRepository.findOne({
+    where: { id: commentId },
+    relations: ['likes'],
+  });
+
+  if (!comment) {
+    throw new NotFoundException(`Le commentaire avec l'id ${commentId} n'existe pas.`);
   }
+
+  // Initialisation si vide
+  if (!comment.likes) {
+    comment.likes = [];
+  }
+
+  const hasLiked = comment.likes.some((u) => u.id === user.id);
+
+  if (hasLiked) {
+    // Retirer le like
+    comment.likes = comment.likes.filter((u) => u.id !== user.id);
+  } else {
+    // Ajouter le like
+    comment.likes.push(user);
+  }
+
+  return this.commentRepository.save(comment);
+}
+
+async remove(id: number, user: User) {
+  const comment = await this.commentRepository.findOne({
+    where: { id },
+    relations: ['author']
+  });
+
+  if (!comment) throw new NotFoundException();
+  if (comment.author.id !== user.id) throw new ForbiddenException();
+
+  return this.commentRepository.softRemove(comment);
+}
 }
