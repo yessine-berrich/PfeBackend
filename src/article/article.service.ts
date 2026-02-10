@@ -8,6 +8,7 @@ import { User } from 'src/users/entities/user.entity';
 import { MediaService } from 'src/media/media.service';
 import { ArticleView } from './entities/article-view.entity';
 import { SemanticSearchService } from 'src/semantic-search/semantic-search.service';
+import { ArticleInteractionService } from './article-interaction.service';
 
 @Injectable()
 export class ArticleService {
@@ -21,6 +22,9 @@ export class ArticleService {
     private readonly mediaService: MediaService,
 
     private readonly semanticSearchService: SemanticSearchService,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly articleInteractionService: ArticleInteractionService,
   ) {}
 
   /**
@@ -275,5 +279,46 @@ await this.articleRepository.query(
         1,
       );
     }
+  }
+
+  async toggleLike(articleId: number, userId: number): Promise<Article> {
+    return this.articleInteractionService.toggleLike(articleId, userId);
+  }
+
+  async toggleBookmark(articleId: number, userId: number): Promise<Article> {
+    return this.articleInteractionService.toggleBookmark(articleId, userId);
+  }
+
+  async getArticleInteractions(articleId: number, userId?: number): Promise<any> {
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ['likes', 'bookmarks'],
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article non trouvé');
+    }
+
+    const result = {
+      likesCount: article.likes.length,
+      bookmarksCount: article.bookmarks.length,
+      isLiked: false,
+      isBookmarked: false,
+    };
+
+    if (userId) {
+      result.isLiked = article.likes.some(like => like.id === userId);
+      result.isBookmarked = article.bookmarks.some(bookmark => bookmark.id === userId);
+    }
+
+    return result;
+  }
+
+  async getUserLikedArticles(userId: number): Promise<Article[]> {
+    return this.articleInteractionService.getUserLikedArticles(userId);
+  }
+
+  async getUserBookmarkedArticles(userId: number): Promise<Article[]> {
+    return this.articleInteractionService.getUserBookmarkedArticles(userId);
   }
 }

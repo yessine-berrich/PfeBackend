@@ -1,15 +1,20 @@
-import { IsString, IsNotEmpty, IsInt, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsArray, IsOptional, MinLength, MaxLength } from 'class-validator';
 
 export class CreateCommentDto {
-  @IsString()
-  @IsNotEmpty()
-  content: string;
-
-  @IsInt()
-  @IsNotEmpty()
+  @IsNumber()
   articleId: number;
 
-  @IsInt()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(1000)
+  content: string;
+
   @IsOptional()
-  parentId?: number; // Optionnel : utilisé seulement si c'est une réponse
+  @IsNumber()
+  parentId?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  mentionedUserIds?: number[];
 }

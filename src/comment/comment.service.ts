@@ -1,171 +1,222 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, IsNull } from 'typeorm';
-// Utilisation d'alias pour éviter les conflits avec les types globaux du navigateur
-import { Comment as CommentEntity } from './entities/comment.entity';
+import { Repository } from 'typeorm';
+import { Comment } from './entities/comment.entity';
 import { User } from '../users/entities/user.entity';
-import { 
-  Notification as NotificationEntity, 
-  NotificationType 
-} from '../notification/entities/notification.entity';
-import { NotificationGateway } from '../notification/notification.gateway';
 
 @Injectable()
 export class CommentService {
   constructor(
-    @InjectRepository(CommentEntity)
-    private readonly commentRepository: Repository<CommentEntity>,
-
+    @InjectRepository(Comment)
+    private readonly commentRepository: Repository<Comment>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-
-    @InjectRepository(NotificationEntity)
-    private readonly notificationRepository: Repository<NotificationEntity>,
-
-    private readonly notificationGateway: NotificationGateway,
   ) {}
 
-  async create(createCommentDto: any, author: User) {
-    const { content, articleId, parentId } = createCommentDto;
+  async create(createCommentDto: {
+    articleId: number;
+    content: string;
+    parentId?: number;
+    mentionedUserIds?: number[];
+  }, userId: number): Promise<Comment> {
+    // Récupérer l'utilisateur
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+    
+    if (!user) {
+      throw new NotFoundException('Utilisateur non trouvé');
+    }
 
-    // 1. Création et sauvegarde du commentaire
+    // Créer le commentaire avec les IDs
     const comment = this.commentRepository.create({
-      content,
-      author,
-      article: { id: articleId },
-      parent: parentId ? { id: parentId } : undefined,
+      content: createCommentDto.content,
+      article: { id: createCommentDto.articleId } as any, // Référence à l'article par ID
+      author: user,
     });
 
-    // Extraction des mentions (ex: @Jean)
-    const firstNames = this.extractFirstNames(content);
-    if (firstNames.length > 0) {
-      comment.mentionedUsers = await this.userRepository.findBy({
-        firstName: In(firstNames),
+    // Gérer la réponse à un commentaire parent
+    if (createCommentDto.parentId) {
+      const parentComment = await this.commentRepository.findOne({
+        where: { id: createCommentDto.parentId },
+        relations: ['article'],
       });
+      
+      if (!parentComment) {
+        throw new NotFoundException('Commentaire parent non trouvé');
+      }
+      
+      // Vérifier que le parent appartient au même article
+      if (parentComment.article.id !== createCommentDto.articleId) {
+        throw new ForbiddenException('Le commentaire parent ne correspond pas au même article');
+      }
+      
+      comment.parent = parentComment;
+    }
+
+    // Gérer les mentions
+    if (createCommentDto.mentionedUserIds && createCommentDto.mentionedUserIds.length > 0) {
+      const mentionedUsers = await this.userRepository.findByIds(createCommentDto.mentionedUserIds);
+      comment.mentionedUsers = mentionedUsers;
     }
 
     const savedComment = await this.commentRepository.save(comment);
+    
+    // Retourner avec les relations nécessaires
+    return await this.commentRepository.findOneOrFail({
+      where: { id: savedComment.id },
+      relations: ['author', 'article', 'parent', 'mentionedUsers', 'replies', 'likes'],
+    });
+  }
 
-    // 2. Préparation des notifications
-    const newNotifications: Partial<NotificationEntity>[] = [];
+  async findByArticle(articleId: number): Promise<Comment[]> {
+    // Récupérer tous les commentaires de l'article avec leurs relations
+    const comments = await this.commentRepository.find({
+      where: { 
+        article: { id: articleId } as any,
+        parent: null as any, // Correction pour TypeORM v0.3+
+      },
+      relations: [
+        'author', 
+        'article',
+        'mentionedUsers', 
+        'likes',
+        'replies',
+        'replies.author',
+        'replies.mentionedUsers',
+        'replies.likes',
+      ],
+      order: {
+        createdAt: 'DESC',
+        replies: {
+          createdAt: 'ASC',
+        },
+      },
+    });
 
-    // Cas A : C'est une réponse à un autre commentaire
-    if (parentId) {
-      const parentComment = await this.commentRepository.findOne({
-        where: { id: parentId },
-        relations: ['author'],
-      });
+    return comments;
+  }
 
-      if (parentComment?.author && parentComment.author.id !== author.id) {
-        newNotifications.push({
-          type: NotificationType.REPLY,
-          recipient: parentComment.author,
-          sender: author,
-          comment: savedComment,
-        });
-      }
+  async toggleLike(commentId: number, userId: number): Promise<Comment> {
+    // Récupérer l'utilisateur
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+    
+    if (!user) {
+      throw new NotFoundException('Utilisateur non trouvé');
     }
 
-    // Cas B : Des utilisateurs ont été mentionnés
-    if (savedComment.mentionedUsers?.length > 0) {
-      savedComment.mentionedUsers.forEach((user) => {
-        // On ne notifie pas l'auteur s'il se mentionne lui-même
-        if (user.id !== author.id) {
-          newNotifications.push({
-            type: NotificationType.MENTION,
-            recipient: user,
-            sender: author,
-            comment: savedComment,
-          });
-        }
-      });
+    const comment = await this.commentRepository.findOne({
+      where: { id: commentId },
+      relations: ['likes'],
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Commentaire non trouvé');
     }
 
-    // 3. Sauvegarde et Envoi Temps Réel (WebSockets)
-    if (newNotifications.length > 0) {
-      const savedNotifications = await this.notificationRepository.save(newNotifications);
-      
-      savedNotifications.forEach((notif) => {
-        // On renvoie un objet propre au frontend via Socket.io
-        this.notificationGateway.sendNotification(notif.recipient.id, {
-          id: notif.id,
-          type: notif.type,
-          senderName: `${author.firstName} ${author.lastName || ''}`,
-          commentId: savedComment.id,
-          message: notif.type === NotificationType.MENTION 
-            ? 'vous a mentionné dans un commentaire' 
-            : 'a répondu à votre commentaire',
-          createdAt: notif.createdAt,
-        });
-      });
+    const alreadyLiked = comment.likes.some(like => like.id === user.id);
+    
+    if (alreadyLiked) {
+      // Retirer le like
+      comment.likes = comment.likes.filter(like => like.id !== user.id);
+    } else {
+      // Ajouter le like
+      comment.likes = [...comment.likes, user];
     }
 
-    return savedComment;
+    const savedComment = await this.commentRepository.save(comment);
+    
+    return await this.commentRepository.findOneOrFail({
+      where: { id: savedComment.id },
+      relations: ['author', 'likes'],
+    });
   }
 
-  private extractFirstNames(content: string): string[] {
-    const mentionRegex = /@(\w+)/g;
-    const matches = content.match(mentionRegex);
-    if (!matches) return [];
-    // Nettoyage : on enlève le '@' et on supprime les doublons
-    return [...new Set(matches.map((match) => match.substring(1)))];
+  async update(commentId: number, content: string, userId: number): Promise<Comment> {
+    // Récupérer l'utilisateur
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+    
+    if (!user) {
+      throw new NotFoundException('Utilisateur non trouvé');
+    }
+
+    const comment = await this.commentRepository.findOne({
+      where: { id: commentId },
+      relations: ['author'],
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Commentaire non trouvé');
+    }
+
+    if (comment.author.id !== user.id) {
+      throw new ForbiddenException('Vous ne pouvez pas modifier ce commentaire');
+    }
+
+    comment.content = content;
+    comment.isEdited = true;
+    comment.updatedAt = new Date();
+
+    const savedComment = await this.commentRepository.save(comment);
+    
+    return await this.commentRepository.findOneOrFail({
+      where: { id: savedComment.id },
+      relations: ['author', 'mentionedUsers', 'likes', 'replies'],
+    });
   }
 
-  async findByArticle(articleId: number) {
-  return this.commentRepository.find({
-    where: {
-      article: { id: articleId },
-      parent: IsNull(),
-    },
-    relations: [
-      'author', 
-      'likes', // Crucial pour afficher le compte des likes
-      'replies', 
-      'replies.author', 
-      'replies.likes' // Si vous voulez aussi les likes sur les réponses
-    ],
-    order: { createdAt: 'DESC' },
-  });
-}
+  async remove(commentId: number, userId: number): Promise<void> {
+    // Récupérer l'utilisateur
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+    
+    if (!user) {
+      throw new NotFoundException('Utilisateur non trouvé');
+    }
 
-async toggleLike(commentId: number, user: User) {
-  // On charge le commentaire avec ses likes existants
-  const comment = await this.commentRepository.findOne({
-    where: { id: commentId },
-    relations: ['likes'],
-  });
+    const comment = await this.commentRepository.findOne({
+      where: { id: commentId },
+      relations: ['author', 'replies'],
+    });
 
-  if (!comment) {
-    throw new NotFoundException(`Le commentaire avec l'id ${commentId} n'existe pas.`);
+    if (!comment) {
+      throw new NotFoundException('Commentaire non trouvé');
+    }
+
+    // Vérifier les permissions (auteur ou admin)
+    const isAuthor = comment.author.id === user.id;
+    const isAdmin = user.role === 'ADMIN';
+    
+    if (!isAuthor && !isAdmin) {
+      throw new ForbiddenException('Vous ne pouvez pas supprimer ce commentaire');
+    }
+
+    // Si le commentaire a des réponses, marquer comme supprimé
+    if (comment.replies && comment.replies.length > 0) {
+      comment.content = '[Commentaire supprimé]';
+      comment.deletedAt = new Date();
+      await this.commentRepository.save(comment);
+    } else {
+      // Sinon, supprimer définitivement
+      await this.commentRepository.remove(comment);
+    }
   }
 
-  // Initialisation si vide
-  if (!comment.likes) {
-    comment.likes = [];
+  async getCommentStats(articleId: number): Promise<{ total: number; withReplies: number }> {
+    const comments = await this.commentRepository.find({
+      where: { article: { id: articleId } as any },
+    });
+
+    const withReplies = comments.filter(comment => comment.replies && comment.replies.length > 0).length;
+
+    return {
+      total: comments.length,
+      withReplies,
+    };
   }
-
-  const hasLiked = comment.likes.some((u) => u.id === user.id);
-
-  if (hasLiked) {
-    // Retirer le like
-    comment.likes = comment.likes.filter((u) => u.id !== user.id);
-  } else {
-    // Ajouter le like
-    comment.likes.push(user);
-  }
-
-  return this.commentRepository.save(comment);
-}
-
-async remove(id: number, user: User) {
-  const comment = await this.commentRepository.findOne({
-    where: { id },
-    relations: ['author']
-  });
-
-  if (!comment) throw new NotFoundException();
-  if (comment.author.id !== user.id) throw new ForbiddenException();
-
-  return this.commentRepository.softRemove(comment);
-}
 }

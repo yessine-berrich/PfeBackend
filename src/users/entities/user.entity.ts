@@ -83,6 +83,12 @@ export class User {
   @ManyToMany(() => Comment, (comment) => comment.likes)
   likedComments: Comment[];
 
+  @ManyToMany(() => Article, (article) => article.likes)
+  likedArticles: Article[];
+
+  @ManyToMany(() => Article, (article) => article.bookmarks)
+  bookmarkedArticles: Article[];
+
   @OneToMany(() => Notification, (notification) => notification.recipient)
   notifications: Notification[];
 

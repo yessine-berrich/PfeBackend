@@ -57,9 +57,16 @@ export class Article {
   @OneToMany(() => Comment, (comment) => comment.article)
   comments: Comment[];
 
-  // NOUVEAU : Relation pour les pièces jointes (fichiers et/ou images non-intégrées au Markdown)
   @OneToMany(() => Media, (media) => media.article, { cascade: true }) // important pour sauvegarder les médias avec l'article
   media: Media[];
+
+  @ManyToMany(() => User, (user) => user.likedArticles)
+  @JoinTable({ name: 'article_likes' })
+  likes: User[];
+
+  @ManyToMany(() => User, (user) => user.bookmarkedArticles)
+  @JoinTable({ name: 'article_bookmarks' })
+  bookmarks: User[];
 
   @OneToMany(() => ArticleVersion, (version) => version.article)
   versions: ArticleVersion[];

@@ -1,3 +1,4 @@
+import { ArticleInteractionService } from './article-interaction.service';
 import {
   Controller,
   Get,
@@ -30,6 +31,8 @@ export class ArticleController {
   constructor(
     private readonly articleService: ArticleService,
     private readonly semanticSearchService: SemanticSearchService,
+        private readonly articleInteractionService: ArticleInteractionService,
+
   ) {}
 
   @Post()
@@ -126,4 +129,138 @@ async semanticSearch(@Body() body: any) {
     };
   }
 }
+
+// LIKE ENDPOINT
+  @Post(':id/like')
+  @UseGuards(AuthGuard)
+  async toggleLike(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentPayload() payload: JwtPayloadType,
+  ) {
+    try {
+      const article = await this.articleInteractionService.toggleLike(id, payload.sub);
+      return {
+        success: true,
+        message: 'Like mis à jour avec succès',
+        article: {
+          id: article.id,
+          title: article.title,
+          likesCount: article.likes?.length || 0,
+          isLiked: article.likes?.some(like => like.id === payload.sub) || false,
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message || 'Erreur lors du like');
+    }
+  }
+
+  // BOOKMARK ENDPOINT
+  @Post(':id/bookmark')
+  @UseGuards(AuthGuard)
+  async toggleBookmark(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentPayload() payload: JwtPayloadType,
+  ) {
+    try {
+      const article = await this.articleInteractionService.toggleBookmark(id, payload.sub);
+      return {
+        success: true,
+        message: 'Bookmark mis à jour avec succès',
+        article: {
+          id: article.id,
+          title: article.title,
+          bookmarksCount: article.bookmarks?.length || 0,
+          isBookmarked: article.bookmarks?.some(bookmark => bookmark.id === payload.sub) || false,
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message || 'Erreur lors du bookmark');
+    }
+  }
+
+  // GET INTERACTIONS FOR SPECIFIC ARTICLE
+  @Get(':id/interactions')
+  @UseGuards(AuthGuard)
+  async getArticleInteractions(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentPayload() payload: JwtPayloadType,
+  ) {
+    try {
+      const interactions = await this.articleService.getArticleInteractions(id, payload.sub);
+      return {
+        success: true,
+        interactions,
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message || 'Erreur lors de la récupération des interactions');
+    }
+  }
+
+  // GET USER'S LIKED ARTICLES
+  @Get('user/liked')
+  @UseGuards(AuthGuard)
+  async getUserLikedArticles(
+    @CurrentPayload() payload: JwtPayloadType,
+  ) {
+    try {
+      const articles = await this.articleInteractionService.getUserLikedArticles(payload.sub);
+      return {
+        success: true,
+        count: articles.length,
+        articles: articles.map(article => ({
+          id: article.id,
+          title: article.title,
+          description: article.content?.substring(0, 150) + '...' || '',
+          author: article.author ? {
+            id: article.author.id,
+            name: `${article.author.firstName} ${article.author.lastName}`,
+            avatar: article.author.profileImage,
+          } : null,
+          category: article.category ? {
+            id: article.category.id,
+            name: article.category.name,
+          } : null,
+          createdAt: article.createdAt,
+          likesCount: article.likes?.length || 0,
+          bookmarksCount: article.bookmarks?.length || 0,
+        })),
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message || 'Erreur lors de la récupération des articles likés');
+    }
+  }
+
+  // GET USER'S BOOKMARKED ARTICLES
+  @Get('user/bookmarked')
+  @UseGuards(AuthGuard)
+  async getUserBookmarkedArticles(
+    @CurrentPayload() payload: JwtPayloadType,
+  ) {
+    try {
+      const articles = await this.articleInteractionService.getUserBookmarkedArticles(payload.sub);
+      return {
+        success: true,
+        count: articles.length,
+        articles: articles.map(article => ({
+          id: article.id,
+          title: article.title,
+          description: article.content?.substring(0, 150) + '...' || '',
+          author: article.author ? {
+            id: article.author.id,
+            name: `${article.author.firstName} ${article.author.lastName}`,
+            avatar: article.author.profileImage,
+          } : null,
+          category: article.category ? {
+            id: article.category.id,
+            name: article.category.name,
+          } : null,
+          createdAt: article.createdAt,
+          likesCount: article.likes?.length || 0,
+          bookmarksCount: article.bookmarks?.length || 0,
+        })),
+      };
+    } catch (error) {
+      throw new BadRequestException(error.message || 'Erreur lors de la récupération des articles bookmarkés');
+    }
+  }
 }

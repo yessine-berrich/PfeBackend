@@ -1,34 +1,74 @@
-// comments.controller.ts
-import { Controller, Post, Get, Body, Param, Delete, UseGuards, Patch } from '@nestjs/common';
+import { 
+  Controller, 
+  Post, 
+  Get, 
+  Body, 
+  Param, 
+  Delete, 
+  UseGuards, 
+  Patch,
+  ParseIntPipe,
+  BadRequestException 
+} from '@nestjs/common';
 import { CommentService } from './comment.service';
-import { User } from '../users/entities/user.entity';
 import { AuthGuard } from 'src/users/guards/auth.guard';
 import { CurrentPayload } from 'src/users/decorators/current-payload.decorator';
+import type { JwtPayloadType } from 'utils/types';
+import { CreateCommentDto } from './dto/create-comment.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
 
-@Controller('comments')
+@Controller('api/comments')
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
-  @UseGuards(AuthGuard)
   @Post()
-  create(@Body() createCommentDto: any, @CurrentPayload() user: User) {
-    return this.commentService.create(createCommentDto, user);
+  @UseGuards(AuthGuard)
+  create(
+    @Body() createCommentDto: CreateCommentDto,
+    @CurrentPayload() payload: JwtPayloadType
+  ) {
+    return this.commentService.create(createCommentDto, payload.sub);
   }
 
   @Get('article/:articleId')
-  findAllByArticle(@Param('articleId') articleId: number) {
+  findAllByArticle(@Param('articleId', ParseIntPipe) articleId: number) {
     return this.commentService.findByArticle(articleId);
   }
 
-  @UseGuards(AuthGuard)
-  @Post(':id/like')
-  toggleLike(@Param('id') id: number, @CurrentPayload() user: User) {
-    return this.commentService.toggleLike(id, user);
+  @Get('article/:articleId/stats')
+  getArticleCommentStats(@Param('articleId', ParseIntPipe) articleId: number) {
+    return this.commentService.getCommentStats(articleId);
   }
 
+  @Post(':id/like')
   @UseGuards(AuthGuard)
+  toggleLike(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentPayload() payload: JwtPayloadType
+  ) {
+    return this.commentService.toggleLike(id, payload.sub);
+  }
+
+  @Patch(':id')
+  @UseGuards(AuthGuard)
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateCommentDto: UpdateCommentDto,
+    @CurrentPayload() payload: JwtPayloadType
+  ) {
+    // Assurez-vous que content existe
+    if (!updateCommentDto.content) {
+      throw new BadRequestException('Le contenu du commentaire est requis');
+    }
+    return this.commentService.update(id, updateCommentDto.content, payload.sub);
+  }
+
   @Delete(':id')
-  remove(@Param('id') id: number, @CurrentPayload() user: User) {
-    return this.commentService.remove(id, user);
+  @UseGuards(AuthGuard)
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentPayload() payload: JwtPayloadType
+  ) {
+    return this.commentService.remove(id, payload.sub);
   }
 }

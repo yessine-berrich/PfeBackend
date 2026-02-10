@@ -10,16 +10,18 @@ import { Tag } from 'src/tag/entities/tag.entity';
 import { UsersModule } from 'src/users/users.module';
 import { MediaModule } from 'src/media/media.module';
 import { ArticleView } from './entities/article-view.entity';
+import { User } from 'src/users/entities/user.entity';
+import { ArticleInteractionService } from './article-interaction.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Article, ArticleVersion, Category, Tag, ArticleView]),
+    TypeOrmModule.forFeature([Article, ArticleVersion, Category, Tag, ArticleView, User]),
     UsersModule,
     MediaModule,
     SemanticSearchModule
   ],
   controllers: [ArticleController],
-  providers: [ArticleService],
-  exports: [ArticleService],
+  providers: [ArticleService, ArticleInteractionService],
+  exports: [ArticleService, ArticleInteractionService],
 })
 export class ArticleModule {}

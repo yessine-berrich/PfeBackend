@@ -7,11 +7,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Comment } from './entities/comment.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Notification } from 'src/notification/entities/notification.entity';
+import { Article } from 'src/article/entities/article.entity';
 
 @Module({
   imports: [
     // 1. Enregistre l'entité pour générer le Repository
-    TypeOrmModule.forFeature([Comment, User, Notification]),
+    TypeOrmModule.forFeature([Comment, User, Notification, Article]),
     // 2. Importe les modules dont les services sont utilisés dans CommentService
     UsersModule,
     NotificationModule,
