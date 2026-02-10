@@ -18,6 +18,7 @@ import { MailModule } from './mail/mail.module';
 import { MediaModule } from './media/media.module';
 import { NotificationModule } from './notification/notification.module';
 import { SemanticSearchModule } from './semantic-search/semantic-search.module';
+import { RagModule } from './rag/rag.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { SemanticSearchModule } from './semantic-search/semantic-search.module';
     NotificationModule,
     MediaModule,
     SemanticSearchModule,
+    RagModule,
   ],
   controllers: [AppController],
   providers: [AppService],

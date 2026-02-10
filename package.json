@@ -25,6 +25,7 @@
     "typeorm:show": "npm run typeorm migration:show"
   },
   "dependencies": {
+    "@langchain/ollama": "^1.2.2",
     "@langchain/openai": "^1.2.5",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/axios": "^4.0.1",
