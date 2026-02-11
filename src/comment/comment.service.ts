@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Comment } from './entities/comment.entity';
 import { User } from '../users/entities/user.entity';
 
@@ -69,70 +69,82 @@ export class CommentService {
     });
   }
 
-  async findByArticle(articleId: number): Promise<Comment[]> {
-    // Récupérer tous les commentaires de l'article avec leurs relations
-    const comments = await this.commentRepository.find({
-      where: { 
-        article: { id: articleId } as any,
-        parent: null as any, // Correction pour TypeORM v0.3+
+  async findByArticle(articleId: number, currentUserId?: number): Promise<any[]> {
+  const comments = await this.commentRepository.find({
+    where: { 
+      article: { id: articleId },
+      parent: IsNull() // ✅ CORRECTION: utiliser { id: null } au lieu de null
+    },
+    relations: [
+      'author', 
+      'replies',
+      'replies.author',
+      'likes',
+      'replies.likes',
+    ],
+    order: {
+      createdAt: 'DESC',
+      replies: {
+        createdAt: 'ASC',
       },
-      relations: [
-        'author', 
-        'article',
-        'mentionedUsers', 
-        'likes',
-        'replies',
-        'replies.author',
-        'replies.mentionedUsers',
-        'replies.likes',
-      ],
-      order: {
-        createdAt: 'DESC',
-        replies: {
-          createdAt: 'ASC',
-        },
-      },
-    });
+    },
+  });
 
-    return comments;
+  // Transformer les données pour le frontend
+  return comments.map(comment => this.transformComment(comment, currentUserId));
+}
+
+private transformComment(comment: Comment, currentUserId?: number): any {
+  return {
+    id: comment.id,
+    content: comment.content,
+    likes: comment.likes?.length || 0,
+    isEdited: comment.isEdited || false,
+    isLiked: currentUserId ? comment.likes?.some(like => like.id === currentUserId) : false,
+    author: {
+      id: comment.author?.id || 0,
+      firstName: comment.author?.firstName || 'Utilisateur',
+      lastName: comment.author?.lastName || 'Inconnu',
+      profileImage: comment.author?.profileImage || null,
+    },
+    parentId: comment.parent?.id || null,
+    createdAt: comment.createdAt,
+    replies: comment.replies?.map(reply => this.transformComment(reply, currentUserId)) || []
+  };
+}
+
+// MODIFIE toggleLike pour retourner le bon format
+async toggleLike(commentId: number, userId: number) {
+  const comment = await this.commentRepository.findOne({
+    where: { id: commentId },
+    relations: ['likes'],
+  });
+
+  if (!comment) {
+    throw new NotFoundException('Commentaire non trouvé');
   }
 
-  async toggleLike(commentId: number, userId: number): Promise<Comment> {
-    // Récupérer l'utilisateur
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
-    
-    if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé');
-    }
-
-    const comment = await this.commentRepository.findOne({
-      where: { id: commentId },
-      relations: ['likes'],
-    });
-
-    if (!comment) {
-      throw new NotFoundException('Commentaire non trouvé');
-    }
-
-    const alreadyLiked = comment.likes.some(like => like.id === user.id);
-    
-    if (alreadyLiked) {
-      // Retirer le like
-      comment.likes = comment.likes.filter(like => like.id !== user.id);
-    } else {
-      // Ajouter le like
-      comment.likes = [...comment.likes, user];
-    }
-
-    const savedComment = await this.commentRepository.save(comment);
-    
-    return await this.commentRepository.findOneOrFail({
-      where: { id: savedComment.id },
-      relations: ['author', 'likes'],
-    });
+  const user = await this.userRepository.findOne({ where: { id: userId } });
+  if (!user) {
+    throw new NotFoundException('Utilisateur non trouvé');
   }
+
+  const alreadyLiked = comment.likes.some(like => like.id === user.id);
+  
+  if (alreadyLiked) {
+    comment.likes = comment.likes.filter(like => like.id !== user.id);
+  } else {
+    comment.likes = [...comment.likes, user];
+  }
+
+  await this.commentRepository.save(comment);
+
+  return {
+    id: comment.id,
+    likes: comment.likes.length,
+    isLiked: !alreadyLiked // Inverse le statut
+  };
+}
 
   async update(commentId: number, content: string, userId: number): Promise<Comment> {
     // Récupérer l'utilisateur

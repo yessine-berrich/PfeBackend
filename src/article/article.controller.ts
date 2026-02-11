@@ -132,6 +132,7 @@ async semanticSearch(@Body() body: any) {
 
 // LIKE ENDPOINT
   @Post(':id/like')
+  @Roles(userRole.ADMIN, userRole.EMPLOYEE)
   @UseGuards(AuthGuard)
   async toggleLike(
     @Param('id', ParseIntPipe) id: number,
