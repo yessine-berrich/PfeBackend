@@ -208,29 +208,6 @@ export class ArticleController {
     }
   }
 
-  // GET INTERACTIONS FOR SPECIFIC ARTICLE
-  @Get(':id/interactions')
-  @UseGuards(AuthGuard)
-  async getArticleInteractions(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentPayload() payload: JwtPayloadType,
-  ) {
-    try {
-      const interactions = await this.articleService.getArticleInteractions(
-        id,
-        payload.sub,
-      );
-      return {
-        success: true,
-        interactions,
-      };
-    } catch (error) {
-      throw new BadRequestException(
-        error.message || 'Erreur lors de la récupération des interactions',
-      );
-    }
-  }
-
   // GET USER'S LIKED ARTICLES
   @Get('user/liked')
   @UseGuards(AuthGuard)

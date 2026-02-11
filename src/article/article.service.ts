@@ -289,31 +289,6 @@ await this.articleRepository.query(
     return this.articleInteractionService.toggleBookmark(articleId, userId);
   }
 
-  async getArticleInteractions(articleId: number, userId?: number): Promise<any> {
-    const article = await this.articleRepository.findOne({
-      where: { id: articleId },
-      relations: ['likes', 'bookmarks'],
-    });
-
-    if (!article) {
-      throw new NotFoundException('Article non trouvé');
-    }
-
-    const result = {
-      likesCount: article.likes.length,
-      bookmarksCount: article.bookmarks.length,
-      isLiked: false,
-      isBookmarked: false,
-    };
-
-    if (userId) {
-      result.isLiked = article.likes.some(like => like.id === userId);
-      result.isBookmarked = article.bookmarks.some(bookmark => bookmark.id === userId);
-    }
-
-    return result;
-  }
-
   async getUserLikedArticles(userId: number): Promise<Article[]> {
     return this.articleInteractionService.getUserLikedArticles(userId);
   }
