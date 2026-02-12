@@ -15,10 +15,17 @@ import { ArticleInteractionService } from './article-interaction.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Article, ArticleVersion, Category, Tag, ArticleView, User]),
+    TypeOrmModule.forFeature([
+      Article,
+      ArticleVersion,
+      Category,
+      Tag,
+      ArticleView,
+      User,
+    ]),
     UsersModule,
     MediaModule,
-    SemanticSearchModule
+    SemanticSearchModule,
   ],
   controllers: [ArticleController],
   providers: [ArticleService, ArticleInteractionService],

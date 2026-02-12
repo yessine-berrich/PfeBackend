@@ -1,4 +1,13 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateArticleDto } from './create-article.dto';
+import { ArticleStatus } from "utils/constants";
 
-export class UpdateArticleDto extends PartialType(CreateArticleDto) {}
+// src/article/dto/update-article.dto.ts
+export class UpdateArticleDto {
+  title?: string;
+  content?: string;
+  status?: ArticleStatus;
+  categoryId?: number;
+  tagIds?: number[];
+  
+  // Ajout recommandé pour le versioning
+  changeSummary?: string;     // ← message de commit / changelog
+}

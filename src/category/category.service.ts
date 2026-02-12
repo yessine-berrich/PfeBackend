@@ -1,5 +1,5 @@
 // category.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './entities/category.entity';
@@ -44,8 +44,22 @@ export class CategoryService {
     return this.categoryRepository.save(category);
   }
 
-  async remove(id: number): Promise<void> {
+async remove(id: number): Promise<{ message: string; id: number }> {
     const category = await this.findOne(id);
+    
+    // Vérifier si la catégorie a des articles associés
+    if (category.articles && category.articles.length > 0) {
+      throw new BadRequestException(
+        `Cannot delete category "${category.name}" because it has ${category.articles.length} associated article(s)`
+      );
+    }
+    
     await this.categoryRepository.remove(category);
+    
+    // Retourner une confirmation explicite
+    return {
+      message: `Category "${category.name}" successfully deleted`,
+      id: category.id,
+    };
   }
 }

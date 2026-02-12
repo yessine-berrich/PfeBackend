@@ -16,12 +16,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { ArticleVersion } from './article-version.entity';
-
-export enum ArticleStatus {
-  DRAFT = 'draft',
-  PENDING = 'pending', // Correction, 'pending' ou 'draft' selon tes besoins
-  PUBLISHED = 'published',
-}
+import { ArticleStatus } from 'utils/constants';
 
 @Entity('articles')
 export class Article {
@@ -32,7 +27,7 @@ export class Article {
   title: string;
 
   @Column({ type: 'text' })
-  content: string; // Stockera le Markdown (avec URLs d'images)
+  content: string;
 
   @Column({
     type: 'enum',
@@ -50,14 +45,14 @@ export class Article {
   @ManyToOne(() => Category, (category) => category.articles)
   category: Category;
 
-  @ManyToMany(() => Tag, (tag) => tag.articles) // Ajoute (tag) => tag.articles ici
+  @ManyToMany(() => Tag, (tag) => tag.articles)
   @JoinTable({ name: 'article_tags' })
   tags: Tag[];
 
   @OneToMany(() => Comment, (comment) => comment.article)
   comments: Comment[];
 
-  @OneToMany(() => Media, (media) => media.article, { cascade: true }) // important pour sauvegarder les médias avec l'article
+  @OneToMany(() => Media, (media) => media.article, { cascade: true })
   media: Media[];
 
   @ManyToMany(() => User, (user) => user.likedArticles)
@@ -68,11 +63,16 @@ export class Article {
   @JoinTable({ name: 'article_bookmarks' })
   bookmarks: User[];
 
-  @OneToMany(() => ArticleVersion, (version) => version.article)
+  @OneToMany(() => ArticleVersion, (version) => version.article, {
+    cascade: false,
+  })
   versions: ArticleVersion[];
 
+  @Column({ nullable: true })
+  currentVersionNumber?: number;
+
   @Column({
-    type: 'float4', // On trompe TypeORM temporairement
+    type: 'float4',
     array: true,
     nullable: true,
   })

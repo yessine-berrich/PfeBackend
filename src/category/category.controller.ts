@@ -37,7 +37,7 @@ export class CategoryController {
   }
 
   @Delete(':id')
-  @Roles(userRole.ADMIN)
+  @Roles(userRole.ADMIN, userRole.EMPLOYEE)
   @UseGuards(AuthGuard)
   remove(@Param('id') id: string) {
     return this.categoryService.remove(+id);

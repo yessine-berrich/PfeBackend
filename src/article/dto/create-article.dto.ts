@@ -1,7 +1,7 @@
 import { IsString, IsNotEmpty, IsInt, IsArray, IsEnum, IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ArticleStatus } from '../entities/article.entity';
 import { CreateMediaDto } from '../../media/dto/create-media.dto'; // Importe le DTO du Media
+import { ArticleStatus } from 'utils/constants';
 
 export class CreateArticleDto {
   @IsString()

@@ -32,16 +32,16 @@ export class ArticleInteractionService {
       throw new NotFoundException('Utilisateur non trouvé');
     }
 
-    const alreadyLiked = article.likes.some(like => like.id === user.id);
-    
+    const alreadyLiked = article.likes.some((like) => like.id === user.id);
+
     if (alreadyLiked) {
-      article.likes = article.likes.filter(like => like.id !== user.id);
+      article.likes = article.likes.filter((like) => like.id !== user.id);
     } else {
       article.likes = [...article.likes, user];
     }
 
     const savedArticle = await this.articleRepository.save(article);
-    
+
     return await this.articleRepository.findOneOrFail({
       where: { id: savedArticle.id },
       relations: ['likes', 'bookmarks', 'author', 'category', 'tags'],
@@ -66,16 +66,20 @@ export class ArticleInteractionService {
       throw new NotFoundException('Utilisateur non trouvé');
     }
 
-    const alreadyBookmarked = article.bookmarks.some(bookmark => bookmark.id === user.id);
-    
+    const alreadyBookmarked = article.bookmarks.some(
+      (bookmark) => bookmark.id === user.id,
+    );
+
     if (alreadyBookmarked) {
-      article.bookmarks = article.bookmarks.filter(bookmark => bookmark.id !== user.id);
+      article.bookmarks = article.bookmarks.filter(
+        (bookmark) => bookmark.id !== user.id,
+      );
     } else {
       article.bookmarks = [...article.bookmarks, user];
     }
 
     const savedArticle = await this.articleRepository.save(article);
-    
+
     return await this.articleRepository.findOneOrFail({
       where: { id: savedArticle.id },
       relations: ['likes', 'bookmarks', 'author', 'category', 'tags'],
@@ -108,7 +112,10 @@ export class ArticleInteractionService {
     return article.bookmarks.length;
   }
 
-  async isArticleLikedByUser(articleId: number, userId: number): Promise<boolean> {
+  async isArticleLikedByUser(
+    articleId: number,
+    userId: number,
+  ): Promise<boolean> {
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
       relations: ['likes'],
@@ -118,10 +125,13 @@ export class ArticleInteractionService {
       throw new NotFoundException('Article non trouvé');
     }
 
-    return article.likes.some(like => like.id === userId);
+    return article.likes.some((like) => like.id === userId);
   }
 
-  async isArticleBookmarkedByUser(articleId: number, userId: number): Promise<boolean> {
+  async isArticleBookmarkedByUser(
+    articleId: number,
+    userId: number,
+  ): Promise<boolean> {
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
       relations: ['bookmarks'],
@@ -131,7 +141,7 @@ export class ArticleInteractionService {
       throw new NotFoundException('Article non trouvé');
     }
 
-    return article.bookmarks.some(bookmark => bookmark.id === userId);
+    return article.bookmarks.some((bookmark) => bookmark.id === userId);
   }
 
   async getUserLikedArticles(userId: number): Promise<Article[]> {

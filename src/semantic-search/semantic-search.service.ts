@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { Article } from 'src/article/entities/article.entity';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { ArticleStatus } from 'src/article/entities/article.entity';
+import { ArticleStatus } from 'utils/constants';
 
 @Injectable()
 export class SemanticSearchService {

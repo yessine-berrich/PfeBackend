@@ -16,14 +16,13 @@ import {
 } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
-import { userRole } from 'utils/constants';
+import { ArticleStatus, userRole } from 'utils/constants';
 import { ArticleService } from './article.service';
 import { Roles } from 'src/users/decorators/user-role.decorator';
 import { AuthGuard } from 'src/users/guards/auth.guard';
 import { CurrentPayload } from 'src/users/decorators/current-payload.decorator';
 import type { JwtPayloadType } from 'utils/types';
 import { User } from 'src/users/entities/user.entity';
-import { ArticleStatus } from './entities/article.entity';
 import { SemanticSearchService } from 'src/semantic-search/semantic-search.service';
 
 @Controller('api/articles')
@@ -56,21 +55,52 @@ export class ArticleController {
     return this.articleService.findOne(id);
   }
 
+  // ─── UPDATE ────────────────────────────────────────
   @Patch(':id')
   @Roles(userRole.ADMIN, userRole.EMPLOYEE)
   @UseGuards(AuthGuard)
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateArticleDto: UpdateArticleDto,
+    @CurrentPayload() payload: JwtPayloadType, // ← AJOUTÉ ICI
   ) {
-    return this.articleService.update(id, updateArticleDto);
+    const user = { id: payload.sub } as User; // ou mieux : await this.userService.findOne(payload.sub)
+    return this.articleService.update(id, updateArticleDto, user);
   }
 
+  // ─── DELETE ────────────────────────────────────────
   @Delete(':id')
   @Roles(userRole.ADMIN, userRole.EMPLOYEE)
   @UseGuards(AuthGuard)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.articleService.remove(id);
+  }
+
+  @Get(':id/history')
+  @UseGuards(AuthGuard)
+  async getHistory(@Param('id', ParseIntPipe) id: number) {
+    return this.articleService.getHistory(id);
+  }
+
+  @Post(':id/revert/:versionNumber')
+  @Roles(userRole.ADMIN, userRole.EMPLOYEE)
+  @UseGuards(AuthGuard)
+  async revertToVersion(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('versionNumber', ParseIntPipe) versionNumber: number,
+    @CurrentPayload() payload: JwtPayloadType,
+  ) {
+    const user = { id: payload.sub } as User;
+    const article = await this.articleService.revertToVersion(
+      id,
+      versionNumber,
+      user,
+    );
+    return {
+      success: true,
+      message: `Article revenu à la version ${versionNumber}`,
+      article: { id: article.id, title: article.title, status: article.status },
+    };
   }
 
   @Post(':id/view')

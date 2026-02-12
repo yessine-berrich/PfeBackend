@@ -6,5 +6,6 @@ export enum userRole {
 export enum ArticleStatus {
   DRAFT = 'draft',
   PUBLISHED = 'published',
+  PENDING = 'pending',
   ARCHIVED = 'archived',
 }
