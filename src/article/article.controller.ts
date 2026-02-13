@@ -13,6 +13,7 @@ import {
   BadRequestException,
   ParseFloatPipe,
   DefaultValuePipe,
+  Req,
 } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
@@ -25,6 +26,9 @@ import type { JwtPayloadType } from 'utils/types';
 import { User } from 'src/users/entities/user.entity';
 import { SemanticSearchService } from 'src/semantic-search/semantic-search.service';
 import { UsersService } from 'src/users/users.service';
+import type { Request } from 'express';
+import { JwtService } from '@nestjs/jwt'; // 👈 AJOUTER CET IMPORT
+
 
 @Controller('api/articles')
 export class ArticleController {
@@ -33,6 +37,7 @@ export class ArticleController {
     private readonly userService: UsersService,
     private readonly semanticSearchService: SemanticSearchService,
     private readonly articleInteractionService: ArticleInteractionService,
+    private readonly jwtService: JwtService, // 👈 AJOUTER DANS LE CONSTRUCTEUR
   ) {}
 
   @Post()
@@ -49,54 +54,64 @@ export class ArticleController {
 
  // DANS article.controller.ts
 @Get()
-async findAll(@CurrentPayload() payload?: JwtPayloadType) {
-  const articles = await this.articleService.findAll();
-  
-  // Récupérer l'ID utilisateur si connecté
-  const userId = payload?.sub;
-  
-  return articles.map(article => ({
-    id: article.id,
-    title: article.title,
-    content: article.content,
-    description: article.content?.substring(0, 150) + '...' || '',
-    status: article.status,
-    viewsCount: article.viewsCount || 0,
-    createdAt: article.createdAt,
-    updatedAt: article.updatedAt,
+  async findAll(@Req() request: Request) {
+    let userId: number | undefined = undefined;
     
-    // Auteur
-    author: article.author ? {
-      id: article.author.id,
-      name: `${article.author.firstName} ${article.author.lastName}`,
-      initials: `${(article.author.firstName?.charAt(0) || '')}${(article.author.lastName?.charAt(0) || '')}`,
+    try {
+      const authHeader = request.headers.authorization;
+      if (authHeader) {
+        const token = authHeader.split(' ')[1];
+        const payload = this.jwtService.verify(token);
+        userId = payload.sub;
+      }
+    } catch (err) {
+      // Token invalide ou expiré - on ignore
+    }
+    
+    const articles = await this.articleService.findAll();
+    
+    return articles.map(article => {
+      const isLiked = userId ? article.likes?.some(like => like.id === userId) : false;
+      const isBookmarked = userId ? article.bookmarks?.some(bookmark => bookmark.id === userId) : false;
+      
+      return {
+        id: article.id,
+        title: article.title,
+        content: article.content,
+        description: article.content?.substring(0, 150) + '...' || '',
+        status: article.status,
+        viewsCount: article.viewsCount || 0,
+        createdAt: article.createdAt,
+        updatedAt: article.updatedAt,
+        
+        author: article.author ? {
+          id: article.author.id,
+          name: `${article.author.firstName || ''} ${article.author.lastName || ''}`.trim() || 'Utilisateur',
+          initials: ((article.author.firstName?.charAt(0) || '') + (article.author.lastName?.charAt(0) || '')).toUpperCase() || 'U',
+          department: article.author.role || 'Membre',
           avatar: article.author.profileImage,
-    } : null,
-    
-    // Catégorie
-    category: article.category ? {
-      id: article.category.id,
-      name: article.category.name,
-      slug: article.category.name?.toLowerCase().replace(/\s+/g, '-') || '',
-    } : null,
-    
-    // Tags
-    tags: article.tags?.map(tag => tag.name) || [],
-    
-    // ✅ STATISTIQUES
-    stats: {
-      likes: article.likes?.length || 0,
-      comments: article.comments?.length || 0,
-      views: article.viewsCount || 0,
-    },
-    
-    // ✅ ÉTATS DE L'UTILISATEUR CONNECTÉ
-    isLiked: userId ? article.likes?.some(like => like.id === userId) || false : false,
-    isBookmarked: userId ? article.bookmarks?.some(bookmark => bookmark.id === userId) || false : false,
-    
-    isFeatured: false,
-  }));
-}
+        } : null,
+        
+        category: article.category ? {
+          id: article.category.id,
+          name: article.category.name,
+          slug: article.category.name?.toLowerCase().replace(/\s+/g, '-') || '',
+        } : null,
+        
+        tags: article.tags?.map(tag => tag?.name || '').filter(Boolean) || [],
+        
+        stats: {
+          likes: article.likes?.length || 0,
+          comments: article.comments?.length || 0,
+          views: article.viewsCount || 0,
+        },
+        
+        isLiked: isLiked,
+        isBookmarked: isBookmarked,
+        isFeatured: false,
+      };
+    });
+  }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
