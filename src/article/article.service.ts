@@ -282,12 +282,44 @@ ${article.content}
     }
   }
 
+<<<<<<< HEAD
   async findAll() {
     return this.articleRepository.find({
       relations: ['author', 'category', 'tags', 'media'],
+=======
+// DANS article.service.ts
+
+async findAll() {
+  try {
+    console.log('📡 ArticleService.findAll() appelé');
+    
+    const articles = await this.articleRepository.find({
+      relations: [
+        'author', 
+        'category', 
+        'tags', 
+        'media', 
+        'likes',      // ✅ Important: charger les likes
+        'bookmarks',   // ✅ Important: charger les bookmarks
+        'comments'
+      ],
+>>>>>>> 065f0cd663c23de9b04251fffb79125b620ed24e
       order: { createdAt: 'DESC' },
     });
+    
+    console.log(`✅ ${articles.length} articles trouvés avec relations`);
+    
+    // ✅ Vérifier que les relations sont bien chargées
+    articles.forEach(article => {
+      console.log(`📊 Article ${article.id} - likes: ${article.likes?.length || 0}, bookmarks: ${article.bookmarks?.length || 0}`);
+    });
+    
+    return articles;
+  } catch (error) {
+    console.error('❌ Erreur dans articleService.findAll():', error);
+    throw error;
   }
+}
 
   // ────────────────────────────────────────────────
   // Méthode centrale de création de version
