@@ -98,6 +98,17 @@ export class Article {
   @Column({ type: 'text', nullable: true })
   rejectionReason?: string;
 
+  @Column({ type: 'float', nullable: true })
+  duplicateScore?: number; // score max trouvé lors de la dernière vérif
+
+  @Column({ type: 'jsonb', nullable: true })
+  similarArticlesCache?: Array<{
+    id: number;
+    title: string;
+    score: number;
+    createdAt: Date;
+  }>;
+
   @CreateDateColumn()
   createdAt: Date;
 
